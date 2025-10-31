@@ -1,4 +1,4 @@
-name: Build and deploy .NET project to Azure Function App - binance1
+name: Deploy Binance Azure Function
 
 on:
   push:
@@ -7,12 +7,13 @@ on:
 
 env:
   AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
-  DOTNET_VERSION: '8.0.x'  # Use 8.0.x (stable); 9.0.x is preview
+  DOTNET_VERSION: '8.0.x'
+  FUNCTION_APP_NAME: 'binance1'
+  RESOURCE_GROUP: 'binance1_group'  # ← Your RG
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,29 +23,30 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore Dependencies
+      - name: Restore
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
           dotnet restore binazure.csproj
 
-      - name: Build Release to ./output
+      - name: Build
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet build binazure.csproj \
-            --configuration Release \
-            --output ./output \
-            --no-restore
+          dotnet build binazure.csproj --configuration Release --output ./output --no-restore
 
-      - name: Create Deploy ZIP
+      - name: Create ZIP
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
           zip -r ../deploy.zip .
 
-      - name: Deploy to Azure Functions
-        uses: Azure/functions-action@v1.5.1
+      - name: Login to Azure
+        uses: azure/login@v2
         with:
-          app-name: 'binance1'
-          package: '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/deploy.zip'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_66835CE9616E47EEBE3726F60AFA1CD8 }}
-          scm-do-build-during-deployment: false
-          enable-oryx-build: false
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy
+        run: |
+          az functionapp deployment source config-zip \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.FUNCTION_APP_NAME }} \
+            --src-path '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/deploy.zip' \
+            --build-remote false
