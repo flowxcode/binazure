@@ -4,7 +4,6 @@
     <AzureFunctionsVersion>v4</AzureFunctionsVersion>
     <RootNamespace>Company.Function</RootNamespace>
     <PublishReadyToRun>true</PublishReadyToRun>
-    <PublishTrimmed>false</PublishTrimmed> <!-- Only if no reflection -->
   </PropertyGroup>
 
   <ItemGroup>
