@@ -1,56 +1,40 @@
-name: Deploy Binance Trading Bot (Isolated .NET 8)
+name: Deploy Binance Grok Function
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
-  DOTNET_VERSION: '8.0.x'
-  FUNCTION_APP_NAME: 'binance1'
-  RESOURCE_GROUP: 'binance1_group'
-
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+    environment: production
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-version: '8.0.x'
 
-      - name: Restore
-        run: |
-          cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet restore binazure.csproj
-
-      - name: Publish (creates .azurefunctions automatically)
-        run: |
-          cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet publish binazure.csproj \
-            --configuration Release \
-            --output ./output \
-            --no-restore
-
-      - name: Create ZIP
-        run: |
-          cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
-          zip -r ../deploy.zip .
+      - name: Install Azure Functions Core Tools
+        run: npm install -g azure-functions-core-tools@4 --unsafe-perm true
 
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy
+      - name: Publish Function App
         run: |
-          cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          az functionapp deployment source config-zip \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --name ${{ env.FUNCTION_APP_NAME }} \
-            --src deploy.zip \
-            --build-remote false
+          func azure functionapp publish binance1 --csharp
+
+      - name: Sync Triggers
+        uses: azure/CLI@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az functionapp function sync-triggers \
+              --name binance1 \
+              --resource-group binance1_group
