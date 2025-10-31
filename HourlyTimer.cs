@@ -1,6 +1,6 @@
 using System;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Host;
+using System.Threading.Tasks;
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using NCrontab;
 
@@ -8,30 +8,40 @@ namespace Company.Function
 {
     public class HourlyTimer
     {
+        private readonly ILogger<HourlyTimer> _logger;
         private static readonly CrontabSchedule Schedule = CrontabSchedule.Parse(
-            "0 * * * * *", 
-            new CrontabSchedule.ParseOptions { IncludingSeconds = true });
+            "0 * * * * *", new CrontabSchedule.ParseOptions { IncludingSeconds = true });
 
-        [FunctionName("HourlyTimer")]
-        public void Run([TimerTrigger("0 * * * * *")] TimerInfo myTimer, ILogger log)
+        public HourlyTimer(ILogger<HourlyTimer> logger) => _logger = logger;
+
+        [Function("HourlyTimer")]
+        public async Task Run([TimerTrigger("0 * * * * *")] TimerInfo timer)
         {
             var now = DateTime.UtcNow;
-            var nextAccurate = Schedule.GetNextOccurrence(now);
+            var next = Schedule.GetNextOccurrence(now);
 
-            log.LogInformation($"Timer fired at: {now:HH:mm:ss}");
-            log.LogInformation($"Next run at: {nextAccurate:HH:mm:ss} (accurate)");
-            
-            log.LogInformation("Processing data...");
+            _logger.LogInformation($"Timer fired at: {now:HH:mm:ss}");
+            _logger.LogInformation($"Next run at: {next:HH:mm:ss} (accurate)");
+
+            _logger.LogInformation("Processing data...");
             int result = SomeSimpleCalculation();
-            log.LogInformation($"Result: {result}");
+            _logger.LogInformation($"Result: {result}");
 
-            // Optional: ignore built-in Next
-            // log.LogInformation($"Built-in Next (may be current): {myTimer.ScheduleStatus.Next}");
+            // ---- OPTIONAL: Binance price (no key needed) ----
+            // var price = await GetBinancePriceAsync();
+            // _logger.LogInformation($"BTC/USDT price: ${price}");
         }
 
-        private int SomeSimpleCalculation()
-        {
-            return 42;
-        }
+        private int SomeSimpleCalculation() => 42;
+
+        // Uncomment if you want a quick Binance price check
+        // private static async Task<string> GetBinancePriceAsync()
+        // {
+        //     using var client = new System.Net.Http.HttpClient();
+        //     var json = await client.GetStringAsync(
+        //         "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT");
+        //     var doc = System.Text.Json.JsonDocument.Parse(json);
+        //     return doc.RootElement.GetProperty("price").GetString()!;
+        // }
     }
 }
