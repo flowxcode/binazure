@@ -9,7 +9,7 @@ env:
   AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
   DOTNET_VERSION: '8.0.x'
   FUNCTION_APP_NAME: 'binance1'
-  RESOURCE_GROUP: 'binance1_group'  # ← Your RG
+  RESOURCE_GROUP: 'binance1_group'  # ← Confirmed from your SP
 
 jobs:
   build-and-deploy:
@@ -45,8 +45,9 @@ jobs:
 
       - name: Deploy
         run: |
+          cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
           az functionapp deployment source config-zip \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --name ${{ env.FUNCTION_APP_NAME }} \
-            --src-path '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/deploy.zip' \
+            --src deploy.zip \
             --build-remote false
