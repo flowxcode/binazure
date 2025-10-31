@@ -9,7 +9,7 @@ env:
   AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
   DOTNET_VERSION: '8.0.x'
   FUNCTION_APP_NAME: 'binance1'
-  RESOURCE_GROUP: 'binance1_group'  # ← Confirmed from your SP
+  RESOURCE_GROUP: 'binance1_group'
 
 jobs:
   build-and-deploy:
@@ -33,10 +33,10 @@ jobs:
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
           dotnet build binazure.csproj --configuration Release --output ./output --no-restore
 
-      - name: Create ZIP
+      - name: Create ZIP (Root-Level Files)
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
-          zip -r ../deploy.zip .
+          zip -r ../deploy.zip .   # ← This puts files at root
 
       - name: Login to Azure
         uses: azure/login@v2
