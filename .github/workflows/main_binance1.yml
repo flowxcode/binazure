@@ -1,47 +1,17 @@
-name: Deploy Binance Trading Azure Function
-
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
-env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
-  DOTNET_VERSION: '8.0.x'  # Stable for Functions
-  FUNCTION_APP_NAME: 'binance1'
-  RESOURCE_GROUP: 'binance1_group'
-
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Restore
-        run: |
-          cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet restore binazure.csproj
-
-      - name: Publish (Generates .azurefunctions Folder)
+      - name: Publish
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
           dotnet publish binazure.csproj --configuration Release --output ./output --no-restore
 
-      - name: Create ZIP (Root-Level Structure)
+      - name: Copy host.json
+        run: |
+          cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          cp host.json ./output/
+
+      - name: Create ZIP
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
-          zip -r ../deploy.zip .  # Zips with .azurefunctions at root
-
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          zip -r ../deploy.zip .
 
       - name: Deploy
         run: |
