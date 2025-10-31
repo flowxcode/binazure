@@ -1,4 +1,4 @@
-name: Deploy Binance Trading Azure Function
+name: Deploy Binance Trading Bot (C# + Grok + Binance API)
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 env:
   AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
-  DOTNET_VERSION: '8.0.x'  # Stable for Azure Functions with Binance integration
+  DOTNET_VERSION: '8.0.x'
   FUNCTION_APP_NAME: 'binance1'
   RESOURCE_GROUP: 'binance1_group'
 
@@ -15,47 +15,43 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore
+      - name: Restore Packages
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
           dotnet restore binazure.csproj
 
-      - name: Publish (For In-Process C# Azure Function)
+      - name: Publish Function (In-Process C#)
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet publish binazure.csproj --configuration Release --output ./output --no-restore
+          dotnet publish binazure.csproj \
+            --configuration Release \
+            --output ./output \
+            --no-restore
 
-      - name: Copy host.json to Output Root (Required for Deployment Structure)
+      - name: Copy host.json to Output Root
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
           cp host.json ./output/
 
-      - name: Create ZIP (With host.json at Root for Binance Timer Trigger)
+      - name: Create Deploy ZIP (Root-Level Structure)
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
-          zip -r ../deploy.zip .  # Zips everything at root level for Kudu validation
+          zip -r ../deploy.zip .
 
       - name: Login to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Set In-Process Runtime (Ensures Compatibility for C# Binance/Grok API Calls)
-        run: |
-          az functionapp config appsettings set \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --name ${{ env.FUNCTION_APP_NAME }} \
-            --settings FUNCTIONS_WORKER_RUNTIME=dotnet
-
-      - name: Deploy (ZIP Push for Hourly Grok-Enhanced Binance Trading)
+      - name: Deploy to Azure Function App
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
           az functionapp deployment source config-zip \
