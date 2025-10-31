@@ -3,38 +3,81 @@ name: Deploy Binance Grok Function
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:
+  workflow_dispatch:   # manual run
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    permissions:
+      contents: read
+      id-token: write   # for OIDC login
+
+    env:
+      FUNCTION_APP_NAME: binance1
+      RESOURCE_GROUP: binance1_group
+      DOTNET_VERSION: 8.0.x
 
     steps:
+      # -------------------------------------------------
+      # 1. Checkout
+      # -------------------------------------------------
       - uses: actions/checkout@v4
 
+      # -------------------------------------------------
+      # 2. Install .NET
+      # -------------------------------------------------
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      # -------------------------------------------------
+      # 3. Install Azure Functions Core Tools
+      # -------------------------------------------------
       - name: Install Azure Functions Core Tools
-        run: npm install -g azure-functions-core-tools@4 --unsafe-perm true
+        run: npm i -g azure-functions-core-tools@4 --unsafe-perm true
 
-      - name: Azure Login
+      # -------------------------------------------------
+      # 4. Patch local.settings.json (force isolated)
+      # -------------------------------------------------
+      - name: Patch local.settings.json
+        run: |
+          jq '.Values.FUNCTIONS_WORKER_RUNTIME = "dotnet-isolated"' local.settings.json > tmp.json && mv tmp.json local.settings.json
+          jq 'del(.Values.FUNCTIONS_INPROC_NET8_ENABLED)' local.settings.json > tmp.json && mv tmp.json local.settings.json
+          cat local.settings.json
+
+      # -------------------------------------------------
+      # 5. Azure Login (OIDC – no secrets!)
+      # -------------------------------------------------
+      - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # -------------------------------------------------
+      # 6. Publish (incremental, auto-sync)
+      # -------------------------------------------------
       - name: Publish Function App
         run: |
-          func azure functionapp publish binance1 --csharp
+          func azure functionapp publish ${{ env.FUNCTION_APP_NAME }} --csharp
 
+      # -------------------------------------------------
+      # 7. Sync Triggers (safety)
+      # -------------------------------------------------
       - name: Sync Triggers
-        uses: azure/CLI@v2
+        uses: azure/cli@v2
         with:
           azcliversion: latest
           inlineScript: |
             az functionapp function sync-triggers \
-              --name binance1 \
-              --resource-group binance1_group
+              --name ${{ env.FUNCTION_APP_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP }}
+
+      # -------------------------------------------------
+      # 8. Warm-up (optional)
+      # -------------------------------------------------
+      - name: Warm-up
+        run: |
+          curl -f -m 15 "https://${{ env.FUNCTION_APP_NAME }}.azurewebsites.net/api/health" || echo "Health not ready yet"
