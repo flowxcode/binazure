@@ -8,24 +8,21 @@ namespace Company.Function
 {
     public class HourlyTimer
     {
-        private readonly ILogger<HourlyTimer> _logger;
         private static readonly CrontabSchedule Schedule = CrontabSchedule.Parse(
             "0 * * * * *", new CrontabSchedule.ParseOptions { IncludingSeconds = true });
 
-        public HourlyTimer(ILogger<HourlyTimer> logger) => _logger = logger;
-
         [Function("HourlyTimer")]
-        public async Task Run([TimerTrigger("0 * * * * *")] TimerInfo timer)
+        public async Task Run([TimerTrigger("0 * * * * *")] TimerInfo timer, ILogger log)
         {
             var now = DateTime.UtcNow;
             var next = Schedule.GetNextOccurrence(now);
 
-            _logger.LogInformation($"Timer fired at: {now:HH:mm:ss}");
-            _logger.LogInformation($"Next run at: {next:HH:mm:ss} (accurate)");
+            log.LogInformation($"Timer fired at: {now:HH:mm:ss}");
+            log.LogInformation($"Next run at: {next:HH:mm:ss} (accurate)");
 
-            _logger.LogInformation("Processing data...");
+            log.LogInformation("Processing data...");
             int result = SomeSimpleCalculation();
-            _logger.LogInformation($"Result: {result}");
+            log.LogInformation($"Result: {result}");
 
             // ---- OPTIONAL: Binance price (no key needed) ----
             // var price = await GetBinancePriceAsync();
