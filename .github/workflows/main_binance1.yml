@@ -1,19 +1,58 @@
-      - name: Publish
+name: Deploy Binance Azure Function
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  PROJECT_NAME: binazure
+  DOTNET_VERSION: '8.0.x'
+  FUNCTION_APP_NAME: 'binance1'
+  RESOURCE_GROUP: 'binance1_group'
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore Dependencies
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet publish binazure.csproj --configuration Release --output ./output --no-restore
+          dotnet restore ${{ env.PROJECT_NAME }}.csproj
 
-      - name: Copy host.json
+      - name: Publish Function
+        run: |
+          cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          dotnet publish ${{ env.PROJECT_NAME }}.csproj \
+            --configuration Release \
+            --output ./output \
+            --no-restore
+
+      - name: Copy host.json to Output
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
           cp host.json ./output/
 
-      - name: Create ZIP
+      - name: Create Deploy ZIP
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
           zip -r ../deploy.zip .
 
-      - name: Deploy
+      - name: Login to Azure
+        uses: azure .login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Function App
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
           az functionapp deployment source config-zip \
