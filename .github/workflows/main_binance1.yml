@@ -1,43 +1,47 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/azure/functions-action
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
-name: Build and deploy dotnet core project to Azure Function App - binance1
+# Docs: https://github.com/Azure/functions-action
+name: Build and deploy .NET project to Azure Function App - binance1
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' # set this to the path to your web app project, defaults to the repository root
-  DOTNET_VERSION: '8.0.x' # set this to the dotnet version to use
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.'  # Project root
+  DOTNET_VERSION: '8.0.x'  # Stable for Functions; change back to 9.0.x once tested
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Keep Linux for Consumption plan
     
     steps:
-      - name: 'Checkout GitHub Action'
+      - name: Checkout GitHub Action
         uses: actions/checkout@v4
 
-      - name: Setup DotNet ${{ env.DOTNET_VERSION }} Environment
-        uses: actions/setup-dotnet@v1
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4  # Updated from v1
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: 'Resolve Project Dependencies Using Dotnet'
-        shell: bash
+      - name: Resolve Dependencies & Build
         run: |
-          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet build --configuration Release --output ./output
-          popd
-      
-      - name: 'Run Azure Functions Action'
-        uses: Azure/functions-action@v1
+          cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          dotnet restore --configuration Release
+          dotnet build --configuration Release --output ./output --no-restore
+
+      - name: Create ZIP Package
+        run: |
+          cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
+          zip -r ../deploy.zip .
+
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1.1.2  # Latest v1 patch (fixes some Kudu issues)
         id: fa
         with:
           app-name: 'binance1'
           slot-name: 'Production'
-          package: '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
+          package: '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/deploy.zip'  # Explicit ZIP
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_66835CE9616E47EEBE3726F60AFA1CD8 }}
+          scm-do-build-during-deployment: false  # Explicit: No remote build
+          enable-oryx-build: false  # Disable Oryx (local build only)
+          respect-funcignore: true  # Ignore .funcignore if you have one
